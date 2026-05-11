@@ -1,0 +1,148 @@
+{
+  "name": "LinkedIn Jobs Monitor (Clean Version)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [128, 96],
+      "id": "32eb20a8-1288-4bbc-8c21-9469a7bc9a27",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "aedd6ffe-3611-4df8-9c7d-b2c52793e3b4",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "SUCCEEDED",
+              "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [672, 96],
+      "id": "bcd3bfd9-5c70-467d-a2a9-0f73645dfe9e",
+      "name": "If"
+    },
+    {
+      "parameters": { "amount": 10 },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [896, 176],
+      "id": "e6b07cb8-9435-48d3-b706-241c8e0fc037",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/actor-runs/{{$node[\"Run Actor\"].json.data.id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [496, 96],
+      "id": "b8233ddd-e70b-4d8e-8861-67b86f494b10",
+      "name": "Get Run"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/curious_coder~linkedin-jobs-scraper/runs?token=ВАШ_APIFY_API_TOKEN",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "urls", "value": "={{ Array (\"https://www.linkedin.com/jobs/search?keywords=Digital-Marketing&location=Armenia\") }}" },
+            { "name": "scrapeCompany", "value": "={{ Boolean(true) }}" },
+            { "name": "count", "value": "={{ Number (100) }}" },
+            { "name": "maxPages", "value": "10" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [320, 96],
+      "id": "daff4c1e-cfa0-4ec8-bce1-66a5ebc881c0",
+      "name": "Run Actor"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/datasets/{{$node[\"Run Actor\"].json.data.defaultDatasetId}}/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "format", "value": "json" },
+            { "name": "fields", "value": "id,title,companyName,postedAt,location,applicantsCount,seniorityLevel,salaryInfo,companyWebsite,link,descriptionText" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [896, 16],
+      "id": "1fbe3b47-fe69-404e-84c4-c4ae049575d1",
+      "name": "Get Items"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "ID_ВАШЕЙ_ТАБЛИЦЫ", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "ИМЯ_ЛИСТА", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.id }}",
+            "Title": "={{ $json.title }}",
+            "Company": "={{ $json.companyName }}",
+            "Location": "={{ $json.location }}",
+            "postedAt": "={{ $json.postedAt }}",
+            "Link": "={{ $json.link }}",
+            "Description": "={{ $json.descriptionText }}"
+          },
+          "matchingColumns": ["ID"]
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1360, 80],
+      "id": "6443246b-968a-48f7-b2a2-e5c41b6e5575",
+      "name": "Append or Update"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "id": "0b", "leftValue": "={{ $json.title }}", "rightValue": "digital", "operator": { "type": "string", "operation": "contains" } },
+            { "id": "91", "leftValue": "={{ $json.title }}", "rightValue": "marketing", "operator": { "type": "string", "operation": "contains" } }
+          ],
+          "combinator": "or"
+        }
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [1120, 80],
+      "id": "f96c6d52-0e99-46fd-8f5f-3d0b903166a9",
+      "name": "Filter"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": { "main": [[{ "node": "Run Actor", "type": "main", "index": 0 }]] },
+    "If": { "main": [[{ "node": "Get Items", "type": "main", "index": 0 }], [{ "node": "Wait", "type": "main", "index": 0 }]] },
+    "Wait": { "main": [[{ "node": "Get Run", "type": "main", "index": 0 }]] },
+    "Get Run": { "main": [[{ "node": "If", "type": "main", "index": 0 }]] },
+    "Run Actor": { "main": [[{ "node": "Get Run", "type": "main", "index": 0 }]] },
+    "Get Items": { "main": [[{ "node": "Filter", "type": "main", "index": 0 }]] },
+    "Filter": { "main": [[{ "node": "Append or Update", "type": "main", "index": 0 }]] }
+  }
+}
